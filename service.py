@@ -52,6 +52,12 @@ if(True):
     desc = "auto generated service"
 
     result = sms.create_hosted_service(serv_name, label, desc, location)
+
+    # This does not work.
+    '''
+    operation_result = sms.get_operation_status(result.request_id)
+    print("Cloud service creation operaiton status: " + operation_result.status)
+    '''
 else:
     serv_name = serv_list[0].service_name
     print("Use cloud service " + serv_name)

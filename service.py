@@ -220,22 +220,32 @@ os_hd_1 = OSVirtualHardDisk(image_name, media_link_1)
 os_hd_2 = OSVirtualHardDisk(image_name, media_link_2)
 
 sms.create_virtual_machine_deployment(service_name=serv_name,
-    deployment_name=dep_name,
+    deployment_name=name_1,
     deployment_slot='production',
-    label=dep_name,
+    label=name_1,
     role_name=name_1,
     network_config=endpoint_config,
     system_config=linux_config_1,
     os_virtual_hard_disk=os_hd_1,
     role_size='Medium')
 
-sms.add_role(service_name=serv_name,
-    deployment_name=dep_name,
+sms.create_virtual_machine_deployment(service_name=serv_name,
+    deployment_name=name_2,
+    deployment_slot='production',
+    label=name_2,
     role_name=name_2,
     system_config=linux_config_2,
     os_virtual_hard_disk=os_hd_2,
     role_size='Medium')
 
+'''
+sms.add_role(service_name=serv_name,
+    deployment_name=dep_name,
+    role_name=name_2,
+    system_config=linux_config_2,
+    os_virtual_hard_disk=os_hd_1,
+    role_size='Medium')
+'''
 # Step 4 Start the created VM
 # No need because it is started by default
 # You may need to wait for a sec to see it starts

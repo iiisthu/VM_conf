@@ -204,8 +204,8 @@ media_link_2 = 'https://' + storage_name + '.blob.core.chinacloudapi.cn/vhds/' +
 
 # Step 3 Linux VM configuration, you can use WindowsConfigurationSet
 # for a Windows VM instead
-linux_config_1 = LinuxConfigurationSet('host' + name, 'Tsinghua', 'Mooc_2014', True)
-linux_config_2 = LinuxConfigurationSet('host' + name, 'Tsinghua', 'Mooc_2014', True)
+linux_config_1 = LinuxConfigurationSet('host' + name_1, 'Tsinghua', 'Mooc_2014', True)
+linux_config_2 = LinuxConfigurationSet('host' + name_2, 'Tsinghua', 'Mooc_2014', True)
 
 # Endpoint (port) configuration example, since documentation on this is lacking:
 endpoint_config = ConfigurationSet()
@@ -219,8 +219,8 @@ endpoint_config.input_endpoints.input_endpoints.append(endpoint2)
 os_hd_1 = OSVirtualHardDisk(image_name, media_link_1)
 os_hd_2 = OSVirtualHardDisk(image_name, media_link_2)
 
-sms.create_virtual_machine_deployment(service_name=serv_name,
-    deployment_name=name_1,
+result = sms.create_virtual_machine_deployment(service_name=serv_name,
+    deployment_name=dep_name,
     deployment_slot='production',
     label=name_1,
     role_name=name_1,
@@ -229,6 +229,15 @@ sms.create_virtual_machine_deployment(service_name=serv_name,
     os_virtual_hard_disk=os_hd_1,
     role_size='Medium')
 
+operation_result = sms.get_operation_status(result.request_id)
+print('VM#1 creation operation status: ' + operation_result.status)
+while(operation_result.status != 'Succeeded'):
+    operation_result = sms.get_operation_status(result.request_id)
+
+print('VM#1 creation operation status: ' + operation_result.status)
+
+# Not working
+'''
 sms.create_virtual_machine_deployment(service_name=serv_name,
     deployment_name=name_2,
     deployment_slot='production',
@@ -237,15 +246,22 @@ sms.create_virtual_machine_deployment(service_name=serv_name,
     system_config=linux_config_2,
     os_virtual_hard_disk=os_hd_2,
     role_size='Medium')
-
 '''
-sms.add_role(service_name=serv_name,
+
+result = sms.add_role(service_name=serv_name,
     deployment_name=dep_name,
     role_name=name_2,
     system_config=linux_config_2,
-    os_virtual_hard_disk=os_hd_1,
+    os_virtual_hard_disk=os_hd_2,
     role_size='Medium')
-'''
+
+operation_result = sms.get_operation_status(result.request_id)
+print('VM#2 creation operation status: ' + operation_result.status)
+while(operation_result.status != 'Succeeded'):
+    operation_result = sms.get_operation_status(result.request_id)
+
+print('VM#2 creation operation status: ' + operation_result.status)
+
 # Step 4 Start the created VM
 # No need because it is started by default
 # You may need to wait for a sec to see it starts

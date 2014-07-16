@@ -210,8 +210,8 @@ media_link_2 = 'https://' + storage_name + '.blob.core.chinacloudapi.cn/vhds/' +
 
 # Step 3 Linux VM configuration, you can use WindowsConfigurationSet
 # for a Windows VM instead
-linux_config_1 = LinuxConfigurationSet('host' + name_1, 'Tsinghua', 'Mooc_2014', True)
-linux_config_2 = LinuxConfigurationSet('host' + name_2, 'Tsinghua', 'Mooc_2014', True)
+linux_config_1 = LinuxConfigurationSet('host' + name_1, 'Tsinghua', 'Mooc_2014', False)
+linux_config_2 = LinuxConfigurationSet('host' + name_2, 'Tsinghua', 'Mooc_2014', False)
 
 # Endpoint (port) configuration example, since documentation on this is lacking:
 endpoint_config = ConfigurationSet()

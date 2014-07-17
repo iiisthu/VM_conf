@@ -228,6 +228,7 @@ media_link_1 = 'https://' + storage_name + '.blob.core.chinacloudapi.cn/vhds/' +
 # for a Windows VM instead
 linux_config_1 = LinuxConfigurationSet('host' + name_1, 'Tsinghua', 'Mooc_2014', False)
 
+
 # Endpoint (port) configuration example, since documentation on this is lacking:
 endpoint_config = ConfigurationSet()
 endpoint_config.configuration_set_type = 'NetworkConfiguration'

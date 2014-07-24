@@ -114,6 +114,92 @@ class AzureManage:
         else:
             print("Disk already exists. Skip the copy.")
 
+    def register_image(self):
+        name = 'mylinux'
+        label = 'mylinux'
+        os = 'Linux' # Linux or Windows
+        media_link = 'https://'+ self.storage_name + '.blob.core.chinacloudapi.cn/vhds/image.vhd'
+
+        result = self.sms.list_os_images()
+        for image in result:
+            if image.name == name:
+                result = self.sms.delete_os_image(name)
+
+                self._wait_operand(result, 'Image deletion')
+
+        result = self.sms.add_os_image(label, media_link, name, os)
+        self._wait_operand(result, 'Image creation')
+
+    def build_VM(self):
+        name = 'myvm' + random_str()
+        name_1 = name + '1'
+        name_2 = name + '2'
+
+        dep_name = 'myvm'
+
+        # Step 1 Select an image
+        image_name = 'mylinux'
+
+        # Step 2 Select destination storage account container/blob where the VM disk
+        # will be created
+        media_link_1 = 'https://' + self.storage_name + '.blob.core.chinacloudapi.cn/vhds/' + name_1 + '.vhd'
+        media_link_2 = 'https://' + self.storage_name + '.blob.core.chinacloudapi.cn/vhds/' + name_2 + '.vhd'
+
+
+        # Step 3 Linux VM configuration, you can use WindowsConfigurationSet
+        # for a Windows VM instead
+        linux_config_1 = LinuxConfigurationSet('host' + name_1, 'Tsinghua', 'Mooc_2014', False)
+        linux_config_2 = LinuxConfigurationSet('host' + name_2, 'Tsinghua', 'Mooc_2014', False)
+
+        # Endpoint (port) configuration example, since documentation on this is lacking:
+        endpoint_config = ConfigurationSet()
+        endpoint_config.configuration_set_type = 'NetworkConfiguration'
+        endpoint1 = ConfigurationSetInputEndpoint(name='RDP', protocol='tcp', port='3389', local_port='3389', load_balanced_endpoint_set_name=None, enable_direct_server_return=False)
+        endpoint2 = ConfigurationSetInputEndpoint(name='SSH', protocol='tcp', port='22', local_port='22', load_balanced_endpoint_set_name=None, enable_direct_server_return=False)
+
+        endpoint_config.input_endpoints.input_endpoints.append(endpoint1)
+        endpoint_config.input_endpoints.input_endpoints.append(endpoint2)
+
+        # Virtual hard disk config
+        os_hd_1 = OSVirtualHardDisk(image_name, media_link_1)
+        os_hd_2 = OSVirtualHardDisk(image_name, media_link_2)
+
+        result = self.sms.create_virtual_machine_deployment(service_name = self.serv_name,
+                                                            deployment_name = dep_name,
+                                                            deployment_slot = 'production',
+                                                            label = name_1,
+                                                            role_name = name_1,
+                                                            network_config = endpoint_config,
+                                                            system_config = linux_config_1,
+                                                            os_virtual_hard_disk = os_hd_1,
+                                                            role_size = 'Medium')
+        self._wait_operand(result, "VM#1 Creation")
+
+        result = self.sms.add_role(service_name = self.serv_name,
+                                   deployment_name = dep_name,
+                                   role_name = name_2,
+                                   system_config = linux_config_2,
+                                   os_virtual_hard_disk = os_hd_2,
+                                   role_size = 'Medium')
+        self._wait_operand(result, "VM#2 Creation")
+
+        # Step 4 Create a data disk and attach it to the VMs
+
+        disk_path = 'https://' + self.storage_name + '.blob.core.chinacloudapi.cn/vhds/data_disk.vhd'
+
+        # According to Azure doc, this is ignored when source_media_link is specified
+        media_link = 'https://' + self.storage_name + '.blob.core.chinacloudapi.cn/vhds/' + name_1 + '_disk.vhd'
+
+        result = self.sms.add_data_disk(service_name = self.serv_name,
+                                        deployment_name=dep_name,
+                                        role_name=name_1,
+                                        lun=3,
+                                        media_link=media_link,
+                                        disk_label='data disk',
+                                        disk_name='data_disk',
+                                        host_caching='ReadOnly',
+                                        source_media_link=disk_path)
+        self._wait_operand(result, "Data disk attaching")
 
 
     def _wait_operand(self, result, pro_name):

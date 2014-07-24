@@ -9,18 +9,22 @@ class AzureManage:
     def __init__(self):
         self.serv_host = 'management.core.chinacloudapi.cn'
         self.storage_host = '.blob.core.chinacloudapi.cn'
+        self.location = 'China East'
         self.image_path = 'https://portalvhds7wfwtym5v2wpk.blob.core.chinacloudapi.cn/vhds/mooc-test-linx2-20140708-208615-os-2014-07-08.vhd'
         self.disk_path = 'https://portalvhds7wfwtym5v2wpk.blob.core.chinacloudapi.cn/vhds/used-for-test-used-for-test-0723-1.vhd'
 
-        self.no_conf = False
+        self.no_config = False
         try:
             with open('user_config', 'rb') as conf_file:
                 self.config = pickle.load(conf_file)
         except IOError as err:
             print("No config file. Will be created.")
             sub_id = raw_input("Subscription ID: ")
-            self.config = {'subscription_id' : sub_id, 'certificate_path' : './cert.pem'}
-            self.no_conf = True
+            self.config = {'subscription_id' : sub_id,
+                           'certificate_path' : './cert.pem',
+                           'serv_name' : False,
+                           'storage_name' : False}
+            self.no_config = True
         except pickle.PickleError as perr:
             print("Pickle error: " + str(perr))
 
@@ -33,15 +37,109 @@ class AzureManage:
             print("请确认已经生成证书，并已将证书上传Azure！")
             print("请确认提供的订阅ID是正确的！")
             sub_id = raw_input("Subscription ID: ")
+            self.no_config = True
             self.config['subscription_id'] = sub_id
 
-        if self.no_conf:
-            try:
-                with open('user_config', 'wb') as conf_file:
-                    pickle.dump(self.config, conf_file)
-            except IOError as err:
-                print("File error: " + str(err))
-            except pickle.PickleError as perr:
-                print("Pickle error: " + str(perr))
+        if self.no_config:
+            self._dump_config()
 
-    def
+    def get_hosted_service(self):
+        if self.no_config or not(self.config['serv_name']):
+            print("New hosted service will be created.")
+            self.serv_name = 'thu-mooc' + self._random_str()
+            while not(self.sms.check_hosted_service_name_availability(self.serv_name).result):
+                self.serv_name = 'thu-mooc' + self._random_str()
+            label = 'myhostedservice'
+            desc = 'auto generated service'
+            self.sms.create_hosted_service(self.serv_name, label, desc, self.location)
+
+            self.config['serv_name'] = self.serv_name
+            self._dump_config()
+        else:
+            self.serv_name = self.config['serv_name']
+
+    def get_hosted_storage(self):
+        if self.no_config or not(self.config['storage_name']):
+            print("New storage account will be create.")
+            self.storage_name = 'thu-mooc' + self._random_str()
+            while not(self.sms.check_storage_account_name_availability(self.storage_name).result):
+                self.storage_name = 'thu-mooc' + self._random_str()
+            label = 'mystorageaccount'
+            desc = 'auto generated storage account'
+            result = self.sms.create_storage_account(self.storage_name, desc, label, location = self.location)
+            self._wait_operand(result, 'storage_account creation')
+            self.config['storage_name'] = self.storage_name
+            self._dump_config()
+        else:
+            self.storage_name = self.config['storage_name']
+
+        key = self.get_storage_account_keys(self.storage_name).storage_service_keys.primary
+        self.blob_service = BlobService(account_name = self.storage_name,
+                                        account_key = key,
+                                        host_base = self.storage_host)
+
+    def get_container(self):
+        container_name = 'vhds'
+        flag = True
+        for container in self.blob_service.list_containers():
+            if container.name == container_name:
+                flag = False
+                print('Container already exists, skip the creation!')
+        if flag:
+            self.blob_service.create_container(container_name)
+
+    def copy_image(self):
+        blob_name = 'image.vhd'
+        container_name = 'vhds'
+        flag = True
+        for blob in self.blob_service.list_blobs(container_name):
+            if blob.name == blob_name:
+                flag = False
+        if flag:
+            blob_name = blob_name
+            self.blob_service.copy_blob(container_name, blob_name, self.image_path)
+        else:
+            print("Image already exists. Skip the copy.")
+
+    def copy_disk(self):
+        blob_name = 'data_disk.vhd'
+        container_name = 'vhds'
+        flag = True
+        for blob in self.blob_service.list_blobs(container_name):
+            if blob.name == blob_name:
+                flag = False
+        if flag:
+            blob_name = blob_name
+            self.blob_service.copy_blob(container_name, blob_name, self.disk_path)
+        else:
+            print("Disk already exists. Skip the copy.")
+
+
+
+    def _wait_operand(self, result, pro_name):
+        status = 'Unknown'
+        timeout = 0
+        while status != 'Succeeded' and status != 'Failed' and timeout < 30:
+            time.sleep(1)
+            timeout = timeout + 1
+            status = self.sms.get_operation_status(result.request_id).status
+            print("Procedure " + pro_name +" status: " + status)
+
+    def _dump_config(self):
+        try:
+            with open('user_config', 'wb') as conf_file:
+                pickle.dump(self.config, conf_file)
+        except IOError as err:
+            print("File error: " + str(err))
+        except pickle.PickleError as perr:
+            print("Pickle error: " + str(perr))
+
+    def _random_str(selfrandomlength = 8):
+        str = ''
+        # Do NOT use capital here!
+        chars = 'abcdefghijklmnopqrstuvwxyz1234567890'
+        length = len(chars) - 1
+        random = Random()
+        for i in range(randomlength):
+            str += chars[random.randint(0, length)]
+        return str

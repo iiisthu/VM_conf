@@ -33,9 +33,9 @@ class AzureManage:
                                                 self.config['certificate_path'],
                                                 self.serv_host)
         except:
-            print("服务初始化失败！")
-            print("请确认已经生成证书，并已将证书上传Azure！")
-            print("请确认提供的订阅ID是正确的！")
+            print("Service initialize failed!")
+            print("Please make sure the certificate is generated and uploaded!")
+            print("Please make sure the subscription ID is correct!")
             sub_id = raw_input("Subscription ID: ")
             self.no_config = True
             self.config['subscription_id'] = sub_id
@@ -44,7 +44,7 @@ class AzureManage:
             self._dump_config()
 
     def get_hosted_service(self):
-        if self.no_config or not(self.config['serv_name']):
+        if self.no_config or not(self.config['serv_name']) or self.sms.check_hosted_service_name_availability(self.config['serv_name']).result:
             print("New hosted service will be created.")
             self.serv_name = 'thu-mooc' + self._random_str()
             while not(self.sms.check_hosted_service_name_availability(self.serv_name).result):
@@ -59,11 +59,11 @@ class AzureManage:
             self.serv_name = self.config['serv_name']
 
     def get_hosted_storage(self):
-        if self.no_config or not(self.config['storage_name']):
+        if self.no_config or not(self.config['storage_name']) or self.sms.check_storage_account_name_availability(self.config['storage_name']).result:
             print("New storage account will be create.")
-            self.storage_name = 'thu-mooc' + self._random_str()
+            self.storage_name = 'thumooc' + self._random_str()
             while not(self.sms.check_storage_account_name_availability(self.storage_name).result):
-                self.storage_name = 'thu-mooc' + self._random_str()
+                self.storage_name = 'thumooc' + self._random_str()
             label = 'mystorageaccount'
             desc = 'auto generated storage account'
             result = self.sms.create_storage_account(self.storage_name, desc, label, location = self.location)
@@ -73,7 +73,7 @@ class AzureManage:
         else:
             self.storage_name = self.config['storage_name']
 
-        key = self.get_storage_account_keys(self.storage_name).storage_service_keys.primary
+        key = self.sms.get_storage_account_keys(self.storage_name).storage_service_keys.primary
         self.blob_service = BlobService(account_name = self.storage_name,
                                         account_key = key,
                                         host_base = self.storage_host)
@@ -131,7 +131,7 @@ class AzureManage:
         self._wait_operand(result, 'Image creation')
 
     def build_VM(self):
-        name = 'myvm' + random_str()
+        name = 'myvm' + self._random_str()
         name_1 = name + '1'
         name_2 = name + '2'
 
@@ -193,7 +193,7 @@ class AzureManage:
         result = self.sms.add_data_disk(service_name = self.serv_name,
                                         deployment_name=dep_name,
                                         role_name=name_1,
-                                        lun=3,
+                                        lun=0,
                                         media_link=media_link,
                                         disk_label='data disk',
                                         disk_name='data_disk',
@@ -220,7 +220,7 @@ class AzureManage:
         except pickle.PickleError as perr:
             print("Pickle error: " + str(perr))
 
-    def _random_str(selfrandomlength = 8):
+    def _random_str(self, randomlength = 8):
         str = ''
         # Do NOT use capital here!
         chars = 'abcdefghijklmnopqrstuvwxyz1234567890'

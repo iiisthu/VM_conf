@@ -23,7 +23,8 @@ class AzureManage:
             self.config = {'subscription_id' : sub_id,
                            'certificate_path' : './cert.pem',
                            'serv_name' : False,
-                           'storage_name' : False}
+                           'storage_name' : False,
+                           'deletion' : True}
             self.no_config = True
         except pickle.PickleError as perr:
             print("Pickle error: " + str(perr))
@@ -131,11 +132,18 @@ class AzureManage:
         self._wait_operand(result, 'Image creation')
 
     def build_VM(self):
+        if(not(self.config['deletion'])):
+            self.delete_roles()
+
         name = 'myvm' + self._random_str()
         name_1 = name + '1'
         name_2 = name + '2'
 
-        dep_name = 'myvm'
+        dep_name = name
+        self.config['dep_name'] = dep_name
+        self.config['vm_name_1'] = name_1
+        self.config['vm_name_2'] = name_2
+        self._dump_config()
 
         # Step 1 Select an image
         image_name = 'mylinux'
@@ -201,6 +209,30 @@ class AzureManage:
                                         source_media_link=disk_path)
         self._wait_operand(result, "Data disk attaching")
 
+        self.config['deletion'] = False
+        self._dump_config()
+
+    def delete_roles(self):
+        result = self.sms.delete_role(self.config['serv_name'],
+                                      self.config['dep_name'],
+                                      self.config['vm_name_1'])
+        self._wait_operand(result, 'VM#1 deletion')
+
+        result = self.sms.delete_deployment(self.config['serv_name'],
+                                            self.config['dep_name'])
+        self._wait_operand(result, 'VM#2 deletion')
+        self.config['deletion'] = True
+        self._dump_config()
+
+    def delete_os_images(self):
+        result = self.sms.delete_os_image('mylinux', True)
+        self._wait_operand(result, 'OS image deletion')
+
+    def delete_disks(self):
+        for disk in self.sms.list_disks():
+            if(disk.os == u'Linux'):
+                result = self.sms.delete_disk(disk.name, True)
+                #self._wait_operand(result, disk.name + 'Deletion')
 
     def _wait_operand(self, result, pro_name):
         status = 'Unknown'

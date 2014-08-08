@@ -4,6 +4,7 @@ from azure import *
 from azure.servicemanagement import *
 from azure.storage import *
 from random import Random
+import time
 
 
 class VirtualNetwork:
@@ -95,7 +96,6 @@ def random_str(randomlength = 8):
     for i in range(randomlength):
         str += chars[random.randint(0, length)]
     return str
-
 # Decide the user config
 subscription_id = raw_input("Subscription_id: ")
 certificate_path = raw_input("Certificate_path: ")
@@ -188,6 +188,10 @@ if(flag):
 else:
     print("The image already exists. Skip the copy!")
 
+# Copy the data disk into local container
+blob_name = "data_disk.vhd"
+blob_service.copy_blob(container_name, blob_name, 'https://portalvhds7wfwtym5v2wpk.blob.core.chinacloudapi.cn/vhds/used-for-test-used-for-test-0723-1.vhd')
+
 # Build up a image
 name = 'mylinux'
 label = 'mylinux'
@@ -224,6 +228,7 @@ image_name = 'mylinux'
 
 media_link_1 = 'https://' + storage_name + '.blob.core.chinacloudapi.cn/vhds/' + name_1 + '.vhd'
 
+
 # Step 3 Linux VM configuration, you can use WindowsConfigurationSet
 # for a Windows VM instead
 linux_config_1 = LinuxConfigurationSet('host' + name_1, 'Tsinghua', 'Mooc_2014', False)
@@ -242,8 +247,6 @@ endpoint_config.subnet_names.append('Subnet-1')
 os_hd_1 = OSVirtualHardDisk(image_name, media_link_1)
 
 endpoint_config.static_vip = '192.168.1.1'
-
-print('{ip} is ready to go'.format(ip=endpoint_config.static_vip))
 result = sms.create_virtual_machine_deployment(service_name=serv_name,
                                                deployment_name=dep_name,
                                                deployment_slot='production',
@@ -306,7 +309,44 @@ for i in range(2, 9):
 
 # print('VM#2 creation operation status: ' + operation_result.status)
 
-# Step 4 Start the created VM
+
+# Step 4 Create a data disk and attach it to the VMs
+
+# Add the disk to the list
+disk_path = 'https://' + storage_name + '.blob.core.chinacloudapi.cn/vhds/data_disk.vhd'
+'''
+result = sms.add_disk(has_operating_system=False,
+                      label='data disk',
+                      media_link=disk_path,
+                      name='data_disk',
+                      os='Linux')
+'''
+# According to Azure doc, this is ignored when source_media_link is specified
+media_link = 'https://' + storage_name + '.blob.core.chinacloudapi.cn/vhds/' + name_1 + '_disk.vhd'
+
+status = "Unknown"
+while(status != "Succeeded"):
+    status = "Unknown"
+    print("Try to attach the disk")
+    time.sleep(30)
+    result = sms.add_data_disk(service_name=serv_name,
+                               deployment_name=dep_name,
+                               role_name=name_1,
+                               lun=3,
+                               media_link=media_link,
+                               disk_label='data disk',
+                               disk_name='data_disk',
+                               host_caching='ReadOnly',
+                               source_media_link=disk_path)
+
+    timeout = 0
+    while(timeout < 30 and status != 'Succeeded' and status != 'Failed'):
+        time.sleep(1)
+        timeout = timeout + 1
+        status = sms.get_operation_status(result.request_id).status
+        print("Attaching disk operation status: " + status)
+
+# Step 5 Start the created VM
 # No need because it is started by default
 # You may need to wait for a sec to see it starts
 #sms.start_role(serv_name, name, name)

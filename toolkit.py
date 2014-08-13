@@ -92,23 +92,23 @@ class AzureManage:
         self.image_path = 'https://portalvhds7wfwtym5v2wpk.blob.core.chinacloudapi.cn/vhds/mooc-test-linx2-20140708-208615-os-2014-07-08.vhd'
         self.disk_path = 'https://portalvhds7wfwtym5v2wpk.blob.core.chinacloudapi.cn/vhds/used-for-test-used-for-test-0723-1.vhd'
 
-        self._load_conf = get_conf
-        self._dump_conf = set_conf
+        # self._load_conf = get_conf
+        # self._dump_conf = set_conf
 
         self.no_config = False
-        # try:
-        #     with open('user_config', 'rb') as conf_file:
-        #         self.config = pickle.load(conf_file)
-        # except IOError as err:
-        #     print("No config file. Will be created.")
-        #     sub_id = raw_input("Subscription ID: ")
-        #     self.config = {'subscription_id' : sub_id,
-        #                    'certificate_path' : './cert.pem',
-        #                    'serv_name' : False,
-        #                    'storage_name' : False}
-        #     self.no_config = True
-        # except pickle.PickleError as perr:
-        #     print("Pickle error: " + str(perr))
+        try:
+            with open('user_config', 'rb') as conf_file:
+                self.config = pickle.load(conf_file)
+        except IOError as err:
+            print("No config file. Will be created.")
+            sub_id = raw_input("Subscription ID: ")
+            self.config = {'subscription_id' : sub_id,
+                           'certificate_path' : './cert.pem',
+                           'serv_name' : False,
+                           'storage_name' : False}
+            self.no_config = True
+        except pickle.PickleError as perr:
+            print("Pickle error: " + str(perr))
 
         try:
             self.sms = ServiceManagementService(self.config['subscription_id'],
@@ -353,14 +353,14 @@ class AzureManage:
             status = self.sms.get_operation_status(result.request_id).status
             print("Procedure " + pro_name +" status: " + status)
 
-    # def _dump_config(self):
-    #     try:
-    #         with open('user_config', 'wb') as conf_file:
-    #             pickle.dump(self.config, conf_file)
-    #     except IOError as err:
-    #         print("File error: " + str(err))
-    #     except pickle.PickleError as perr:
-    #         print("Pickle error: " + str(perr))
+    def _dump_config(self):
+        try:
+            with open('user_config', 'wb') as conf_file:
+                pickle.dump(self.config, conf_file)
+        except IOError as err:
+            print("File error: " + str(err))
+        except pickle.PickleError as perr:
+            print("Pickle error: " + str(perr))
 
     def _random_str(self, randomlength = 8):
         str = ''

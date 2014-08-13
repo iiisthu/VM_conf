@@ -11,7 +11,8 @@ class AzureManage:
         self.storage_host = '.blob.core.chinacloudapi.cn'
         self.location = 'China East'
         self.image_path = 'https://portalvhds7wfwtym5v2wpk.blob.core.chinacloudapi.cn/vhds/mooc-test-linx2-20140708-208615-os-2014-07-08.vhd'
-        self.disk_path = 'https://portalvhds7wfwtym5v2wpk.blob.core.chinacloudapi.cn/vhds/used-for-test-used-for-test-0723-1.vhd'
+        #self.disk_path = 'https://portalvhds7wfwtym5v2wpk.blob.core.chinacloudapi.cn/vhds/used-for-test-used-for-test-0723-1.vhd'
+        self.disk_path = 'https://portalvhdsttq9f0f7ly3t.blob.core.chinacloudapi.cn/vhds/camila-camila-0801-1.vhd'
 
         self.no_config = False
         try:
@@ -132,7 +133,7 @@ class AzureManage:
         self._wait_operand(result, 'Image creation')
 
     def build_VM(self):
-        if(not(self.config['deletion'])):
+        if not(self.config['deletion']):
             self.delete_roles()
 
         name = 'myvm' + self._random_str()
@@ -194,20 +195,28 @@ class AzureManage:
         # Step 4 Create a data disk and attach it to the VMs
 
         disk_path = 'https://' + self.storage_name + '.blob.core.chinacloudapi.cn/vhds/data_disk.vhd'
-
+        #disk_path = 'https://portalvhds7wfwtym5v2wpk.blob.core.chinacloudapi.cn/vhds/used-for-test-used-for-test-0723-1.vhd'
         # According to Azure doc, this is ignored when source_media_link is specified
         media_link = 'https://' + self.storage_name + '.blob.core.chinacloudapi.cn/vhds/' + name_1 + '_disk.vhd'
 
-        result = self.sms.add_data_disk(service_name = self.serv_name,
-                                        deployment_name=dep_name,
-                                        role_name=name_1,
-                                        lun=0,
-                                        media_link=media_link,
-                                        disk_label='data disk',
-                                        disk_name='data_disk',
-                                        host_caching='ReadOnly',
-                                        source_media_link=disk_path)
-        self._wait_operand(result, "Data disk attaching")
+        status = 'Unknown'
+        count = 0
+        while status != 'Succeeded':
+            count = count + 3
+            time.sleep(180)
+            print("Try to attaching disk!")
+            print(str(count) + " minutes have passed")
+            result = self.sms.add_data_disk(service_name = self.serv_name,
+                                            deployment_name=dep_name,
+                                            role_name=name_1,
+                                            lun=0,
+                                            media_link=media_link,
+                                            disk_label='data disk',
+                                            disk_name='data_disk',
+                                            host_caching='ReadOnly',
+                                            source_media_link=disk_path)
+            self._wait_operand(result, "Data disk attaching")
+            status = self.sms.get_operation_status(result.request_id).status
 
         self.config['deletion'] = False
         self._dump_config()
@@ -230,9 +239,17 @@ class AzureManage:
 
     def delete_disks(self):
         for disk in self.sms.list_disks():
-            if(disk.os == u'Linux'):
+            if disk.os == u'Linux' or disk.name == u'data_disk':
                 result = self.sms.delete_disk(disk.name, True)
                 #self._wait_operand(result, disk.name + 'Deletion')
+
+    def delete_storage_account(self):
+        self.sms.delete_storage_account(self.config['storage_name'])
+        self.config['storage_name'] = False
+        self._dump_config()
+
+    def delete_cloud_service(self):
+        self.sms.delete_hosted_service(self.serv_name)
 
     def _wait_operand(self, result, pro_name):
         status = 'Unknown'

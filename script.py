@@ -1,4 +1,5 @@
 from toolkit import *
+import time
 a = AzureManage()
 a.get_hosted_service()
 a.get_hosted_storage()

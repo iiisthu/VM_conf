@@ -186,7 +186,7 @@ operation_result = sms.get_operation_status(result.request_id)
 print('Image creation Operation status: ' + operation_result.status)
 
 # Build up VM
-name = 'myvm' + random_str()
+name = 'myvm' + rand2om_str()
 name_1 = name + '1'
 name_2 = name + '2'
 

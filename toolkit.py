@@ -124,7 +124,7 @@ class AzureManage:
             print("Service initialize failed!")
             print("Please make sure the certificate is generated and uploaded!")
             print("Please make sure the subscription ID is correct!")
-            sub_id = raw_input("Subscription ID: ")
+            sub_id = input("Subscription ID: ")
             self.no_config = True
             self.config['subscription_id'] = sub_id
 

@@ -259,7 +259,6 @@ class AzureManage:
 
         dep_name = name
         self.config['dep_name'] = dep_name
-        self._dump_config()
 
         # Step 1 Select an image
         master_image_name = 'myVM-master'
@@ -333,11 +332,14 @@ class AzureManage:
                 role_size='Medium'
             )
             self._wait_operand(result, "VM#{} Creation".format(i))
-
             #pdb.set_trace()
 
-        # Step 4 Create a data disk and attach it to the VMs
+        self._dump_config()
 
+    # Step 4 Create a data disk and attach it to the VMs
+    def attach_disk(self):
+        name_1 = self.config['vm_name_1']
+        dep_name = self.config['dep_name']
         disk_path = 'https://' + self.storage_name + '.blob.core.chinacloudapi.cn/vhds/data_disk.vhd'
 
         # According to Azure doc, this is ignored when source_media_link is specified
@@ -366,14 +368,16 @@ class AzureManage:
         self._dump_config()
 
     def delete_roles(self):
-        result = self.sms.delete_role(self.config['serv_name'],
-                                      self.config['dep_name'],
-                                      self.config['vm_name_1'])
-        self._wait_operand(result, 'VM#1 deletion')
+        for i in range(1, 8):
+            result = self.sms.delete_role(self.config['serv_name'],
+                                          self.config['dep_name'],
+                                          self.config['vm_name_' + str(i)])
+            self._wait_operand(result, 'VM#' + str(i) + ' deletion')
+
 
         result = self.sms.delete_deployment(self.config['serv_name'],
                                             self.config['dep_name'])
-        self._wait_operand(result, 'VM#2 deletion')
+        self._wait_operand(result, 'VM#8 deletion')
         self.config['deletion'] = True
         self._dump_config()
 
@@ -396,7 +400,7 @@ class AzureManage:
         self._dump_config()
 
     def delete_cloud_service(self):
-        self.sms.delete_hosted_service(self.serv_name)
+        self.sms.delete_hosted_service(self.config['serv_name'])
 
     def _wait_operand(self, result, pro_name):
         status = 'Unknown'

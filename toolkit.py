@@ -106,7 +106,7 @@ class AzureManage:
                 self.config = pickle.load(conf_file)
         except IOError as err:
             print("No config file. Will be created.")
-            sub_id = raw_input("Subscription ID: ")
+            sub_id = input("Subscription ID: ")
             self.config = {'subscription_id' : sub_id,
                            'certificate_path' : './cert.pem',
                            'serv_name' : False,

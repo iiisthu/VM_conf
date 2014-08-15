@@ -277,9 +277,13 @@ class AzureManage:
         # Endpoint (port) configuration example, since documentation on this is lacking:
         endpoint_config = ConfigurationSet()
         endpoint_config.configuration_set_type = 'NetworkConfiguration'
-        endpoint = ConfigurationSetInputEndpoint(name='SSH', protocol='tcp', port='1001', local_port= '22', load_balanced_endpoint_set_name=None, enable_direct_server_return=False)
+        endpoint1 = ConfigurationSetInputEndpoint(name='SSH', protocol='tcp', port='22', local_port= '22', load_balanced_endpoint_set_name=None, enable_direct_server_return=False)
+        endpoint2 = ConfigurationSetInputEndpoint(name='Port1', protocol='tcp', port='50030', local_port= '50030', load_balanced_endpoint_set_name=None, enable_direct_server_return=False)
+        endpoint3 = ConfigurationSetInputEndpoint(name='Port2', protocol='tcp', port='50070', local_port= '50070', load_balanced_endpoint_set_name=None, enable_direct_server_return=False)
 
-        endpoint_config.input_endpoints.input_endpoints.append(endpoint)
+        endpoint_config.input_endpoints.input_endpoints.append(endpoint1)
+        endpoint_config.input_endpoints.input_endpoints.append(endpoint2)
+        endpoint_config.input_endpoints.input_endpoints.append(endpoint3)
         endpoint_config.subnet_names.append('Subnet-1')
 
         endpoint_config.static_vip = '192.168.1.1'
@@ -300,10 +304,14 @@ class AzureManage:
         self._wait_operand(result, "VM#1 Creation")
         
         endpoint_config.input_endpoints.input_endpoints.pop()
+        endpoint_config.input_endpoints.input_endpoints.pop()
+        endpoint_config.input_endpoints.input_endpoints.pop()
 
         if choice == 'master-slave':
+            print("Will create slaves")
             image_name = slave_image_name
         else:
+            print("Will create other masters")
             image_name = master_image_name
             
         for i in range(2, 9):

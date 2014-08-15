@@ -48,7 +48,7 @@ class VirtualNetwork:
             while not self.name in vpn_name_list:
                 vpn_list = self.sms.list_virtual_network_sites()
                 vpn_name_list = [vpn.name for vpn in vpn_list]
-                sleep(2)
+                time.sleep(2)
                 print("Virtual network test")
             print("Virtual Network creation finished")
         
@@ -85,13 +85,17 @@ class AGroup:
             print("Affinity Group creation {}".format(operation_result.status))
 
 class AzureManage:
-    def __init__(self, get_conf, set_conf):
+    def __init__(self):
         self.serv_host = 'management.core.chinacloudapi.cn'
         self.storage_host = '.blob.core.chinacloudapi.cn'
         self.location = 'China East'
-        self.image_path = 'https://portalvhds7wfwtym5v2wpk.blob.core.chinacloudapi.cn/vhds/mooc-test-linx2-20140708-208615-os-2014-07-08.vhd'
+        self.master_image_path = 'https://portalvhdsm3378rflqk1z8.blob.core.chinacloudapi.cn/vhds/final.vhd'
+        self.slave_image_path = 'https://portalvhds7wfwtym5v2wpk.blob.core.chinacloudapi.cn/vhds/slave-image.vhd'
+        self.disk_path = 'https://portalvhdsbnqvpmh42k5pk.blob.core.chinacloudapi.cn/vhds/master-master-0812-4.vhd'
+        #self.image_path = 'https://portalvhds7wfwtym5v2wpk.blob.core.chinacloudapi.cn/vhds/mooc-test-linx2-20140708-208615-os-2014-07-08.vhd'
         #self.disk_path = 'https://portalvhds7wfwtym5v2wpk.blob.core.chinacloudapi.cn/vhds/used-for-test-used-for-test-0723-1.vhd'
-        self.disk_path = 'https://portalvhdsttq9f0f7ly3t.blob.core.chinacloudapi.cn/vhds/camila-camila-0801-1.vhd'
+        #self.disk_path = 'https://portalvhdsttq9f0f7ly3t.blob.core.chinacloudapi.cn/vhds/camila-camila-0801-1.vhd'
+        
 
         # self._load_conf = get_conf
         # self._dump_conf = set_conf
@@ -106,7 +110,8 @@ class AzureManage:
             self.config = {'subscription_id' : sub_id,
                            'certificate_path' : './cert.pem',
                            'serv_name' : False,
-                           'storage_name' : False}
+                           'storage_name' : False,
+                           'deletion' : True}
             self.no_config = True
         except pickle.PickleError as perr:
             print("Pickle error: " + str(perr))
@@ -180,17 +185,26 @@ class AzureManage:
             self.blob_service.create_container(container_name)
 
     def copy_image(self):
-        blob_name = 'image.vhd'
+        master_blob_name = 'master-image.vhd'
+        slave_blob_name = 'slave-image.vhd'
         container_name = 'vhds'
         flag = True
         for blob in self.blob_service.list_blobs(container_name):
-            if blob.name == blob_name:
+            if blob.name == master_blob_name:
                 flag = False
         if flag:
-            blob_name = blob_name
-            self.blob_service.copy_blob(container_name, blob_name, self.image_path)
+            self.blob_service.copy_blob(container_name, master_blob_name, self.master_image_path)
         else:
-            print("Image already exists. Skip the copy.")
+            print("Master Image already exists. Skip the copy.")
+
+        flag = True
+        for blob in self.blob_service.list_blobs(container_name):
+            if blob.name == slave_blob_name:
+                flag = False
+        if flag:
+            self.blob_service.copy_blob(container_name, slave_blob_name, self.slave_image_path)
+        else:
+            print("Slave Image already exists. Skip the copy.")
 
     def copy_disk(self):
         blob_name = 'data_disk.vhd'
@@ -206,64 +220,72 @@ class AzureManage:
             print("Disk already exists. Skip the copy.")
 
     def register_image(self):
-        name = 'mylinux'
-        label = 'mylinux'
+        master_name = 'myVM-master'
+        slave_name = 'myVM-slave'
+        label = 'VMforMooc'
         os = 'Linux' # Linux or Windows
-        media_link = 'https://'+ self.storage_name + '.blob.core.chinacloudapi.cn/vhds/image.vhd'
+        master_media_link = 'https://'+ self.storage_name + '.blob.core.chinacloudapi.cn/vhds/master-image.vhd'
+        slave_media_link = 'https://'+ self.storage_name + '.blob.core.chinacloudapi.cn/vhds/slave-image.vhd'
 
         result = self.sms.list_os_images()
+        flag = True
         for image in result:
-            if image.name == name:
-                result = self.sms.delete_os_image(name)
+            if image.name == master_name:
+                flag = False
+        if flag:
+            result = self.sms.add_os_image(label, master_media_link, master_name, os)
+            self._wait_operand(result, 'Master Image creation')
+        else:
+            print("Master image exists, skip the creation!")
 
-                self._wait_operand(result, 'Image deletion')
+        result = self.sms.list_os_images()
+        flag = True
+        for image in result:
+            if image.name == slave_name:
+                flag = False
+        if flag:
+            result = self.sms.add_os_image(label, slave_media_link, slave_name, os)
+            self._wait_operand(result, 'Slave Image creation')
+        else:
+            print("Slave image exists, skip the creation!")
 
-        result = self.sms.add_os_image(label, media_link, name, os)
-        self._wait_operand(result, 'Image creation')
 
-    def build_VM(self):
+    def build_VM(self, choice):
         if not(self.config['deletion']):
             self.delete_roles()
 
         name = 'myvm' + self._random_str()
-        name_1 = name + '1'
-        name_2 = name + '2'
+        self.config['vm_name_1'] = name_1 = name + '1'
 
         dep_name = name
         self.config['dep_name'] = dep_name
-        self.config['vm_name_1'] = name_1
-        self.config['vm_name_2'] = name_2
         self._dump_config()
 
         # Step 1 Select an image
-        image_name = 'mylinux'
+        master_image_name = 'myVM-master'
+        slave_image_name = 'myVM-slave'
 
         # Step 2 Select destination storage account container/blob where the VM disk
         # will be created
         media_link_1 = 'https://' + self.storage_name + '.blob.core.chinacloudapi.cn/vhds/' + name_1 + '.vhd'
-        media_link_2 = 'https://' + self.storage_name + '.blob.core.chinacloudapi.cn/vhds/' + name_2 + '.vhd'
-
 
         # Step 3 Linux VM configuration, you can use WindowsConfigurationSet
         # for a Windows VM instead
         linux_config_1 = LinuxConfigurationSet('host' + name_1, 'Tsinghua', 'Mooc_2014', False)
-        linux_config_2 = LinuxConfigurationSet('host' + name_2, 'Tsinghua', 'Mooc_2014', False)
+
 
         # Endpoint (port) configuration example, since documentation on this is lacking:
         endpoint_config = ConfigurationSet()
         endpoint_config.configuration_set_type = 'NetworkConfiguration'
-        endpoint1 = ConfigurationSetInputEndpoint(name='RDP', protocol='tcp', port='3389', local_port='3389', load_balanced_endpoint_set_name=None, enable_direct_server_return=False)
-        endpoint2 = ConfigurationSetInputEndpoint(name='SSH', protocol='tcp', port='22', local_port='22', load_balanced_endpoint_set_name=None, enable_direct_server_return=False)
+        endpoint = ConfigurationSetInputEndpoint(name='SSH', protocol='tcp', port='1001', local_port= '22', load_balanced_endpoint_set_name=None, enable_direct_server_return=False)
 
-        endpoint_config.input_endpoints.input_endpoints.append(endpoint1)
-        endpoint_config.input_endpoints.input_endpoints.append(endpoint2)
+        endpoint_config.input_endpoints.input_endpoints.append(endpoint)
         endpoint_config.subnet_names.append('Subnet-1')
 
         endpoint_config.static_vip = '192.168.1.1'
 
         # Virtual hard disk config
-        os_hd_1 = OSVirtualHardDisk(image_name, media_link_1)
-        os_hd_2 = OSVirtualHardDisk(image_name, media_link_2)
+        os_hd_1 = OSVirtualHardDisk(master_image_name, media_link_1)
 
         result = self.sms.create_virtual_machine_deployment(service_name = self.serv_name,
                                                             deployment_name = dep_name,
@@ -278,10 +300,14 @@ class AzureManage:
         self._wait_operand(result, "VM#1 Creation")
         
         endpoint_config.input_endpoints.input_endpoints.pop()
-        endpoint_config.input_endpoints.input_endpoints.pop()
 
+        if choice == 'master-slave':
+            image_name = slave_image_name
+        else:
+            image_name = master_image_name
+            
         for i in range(2, 9):
-            name_i = name + str(i)
+            self.config['vm_name_' + str(i)] = name_i = name + str(i)
             ip = endpoint_config.static_vip.split('.')
             ip[-1] = str(i)
             endpoint_config.static_vip = '.'.join(ip)
@@ -300,12 +326,12 @@ class AzureManage:
             )
             self._wait_operand(result, "VM#{} Creation".format(i))
 
-            pdb.set_trace()
+            #pdb.set_trace()
 
         # Step 4 Create a data disk and attach it to the VMs
 
         disk_path = 'https://' + self.storage_name + '.blob.core.chinacloudapi.cn/vhds/data_disk.vhd'
-        #disk_path = 'https://portalvhds7wfwtym5v2wpk.blob.core.chinacloudapi.cn/vhds/used-for-test-used-for-test-0723-1.vhd'
+
         # According to Azure doc, this is ignored when source_media_link is specified
         media_link = 'https://' + self.storage_name + '.blob.core.chinacloudapi.cn/vhds/' + name_1 + '_disk.vhd'
 
@@ -344,8 +370,11 @@ class AzureManage:
         self._dump_config()
 
     def delete_os_images(self):
-        result = self.sms.delete_os_image('mylinux', True)
+        result = self.sms.delete_os_image('myVM-master', True)
         self._wait_operand(result, 'OS image deletion')
+        result = self.sms.delete_os_image('myVM-slave', True)
+        self._wait_operand(result, 'OS image deletion')
+
 
     def delete_disks(self):
         for disk in self.sms.list_disks():

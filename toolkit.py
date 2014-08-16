@@ -390,7 +390,7 @@ class AzureManage:
 
     def delete_disks(self):
         for disk in self.sms.list_disks():
-            if disk.os == u'Linux' or disk.name == u'data_disk':
+            if disk.os == u'Linux':
                 result = self.sms.delete_disk(disk.name, True)
                 #self._wait_operand(result, disk.name + 'Deletion')
 

@@ -219,6 +219,20 @@ class AzureManage:
         else:
             print("Disk already exists. Skip the copy.")
 
+        try:
+            result = self.blob_service.get_blob_properties(container_name, blob_name)
+            while result['x-ms-copy-status'] == 'pending':
+                time.sleep(10)
+                result = self.blob_service.get_blob_properties(container_name, blob_name)
+                tem, total = result['x-ms-copy-progress'].split('/')
+                print("Copy progress: " + str(float(tem) * 100.0 / float(total)) + "%")
+        except:
+            print("Copy aborted!")
+            result = self.blob_service.get_blob_properties(container_name, blob_name)
+            self.blob_service.abort_copy_blob(container_name, blob_name, result['x-ms-copy-id'])
+            self.blob_service.delete_blob(container_name, blob_name)
+        print("Copy finished!")
+
     def register_image(self):
         master_name = 'myVM-master'
         slave_name = 'myVM-slave'
@@ -345,13 +359,21 @@ class AzureManage:
         # According to Azure doc, this is ignored when source_media_link is specified
         media_link = 'https://' + self.storage_name + '.blob.core.chinacloudapi.cn/vhds/' + name_1 + '_disk.vhd'
 
+        result = self.sms.add_data_disk(service_name = self.serv_name,
+                                        deployment_name=dep_name,
+                                        role_name=name_1,
+                                        lun=0,
+                                        media_link=media_link,
+                                        disk_label='data disk',
+                                        disk_name='data_disk',
+                                        host_caching='ReadOnly',
+                                        source_media_link=disk_path)
+        self._wait_operand(result, "Data Attaching")
+
+        '''
         status = 'Unknown'
-        count = 0
         while status != 'Succeeded':
-            count = count + 3
-            time.sleep(180)
             print("Try to attaching disk!")
-            print(str(count) + " minutes have passed")
             result = self.sms.add_data_disk(service_name = self.serv_name,
                                             deployment_name=dep_name,
                                             role_name=name_1,
@@ -363,6 +385,7 @@ class AzureManage:
                                             source_media_link=disk_path)
             self._wait_operand(result, "Data disk attaching")
             status = self.sms.get_operation_status(result.request_id).status
+        '''
 
         self.config['deletion'] = False
         self._dump_config()
@@ -391,6 +414,7 @@ class AzureManage:
     def delete_disks(self):
         for disk in self.sms.list_disks():
             if disk.os == u'Linux':
+                print("Delete data disk " + disk.name)
                 result = self.sms.delete_disk(disk.name, True)
                 #self._wait_operand(result, disk.name + 'Deletion')
 

@@ -91,7 +91,7 @@ class AzureManage:
         self.location = 'China East'
         self.master_image_path = 'https://portalvhdsm3378rflqk1z8.blob.core.chinacloudapi.cn/vhds/final.vhd'
         self.slave_image_path = 'https://portalvhds7wfwtym5v2wpk.blob.core.chinacloudapi.cn/vhds/slave-image.vhd'
-        self.disk_path = 'https://portalvhdsbnqvpmh42k5pk.blob.core.chinacloudapi.cn/vhds/master-master-0812-4.vhd'
+        self.disk_path = 'https://portalvhdsm3378rflqk1z8.blob.core.chinacloudapi.cn/vhds/Data.vhd'
         #self.image_path = 'https://portalvhds7wfwtym5v2wpk.blob.core.chinacloudapi.cn/vhds/mooc-test-linx2-20140708-208615-os-2014-07-08.vhd'
         #self.disk_path = 'https://portalvhds7wfwtym5v2wpk.blob.core.chinacloudapi.cn/vhds/used-for-test-used-for-test-0723-1.vhd'
         #self.disk_path = 'https://portalvhdsttq9f0f7ly3t.blob.core.chinacloudapi.cn/vhds/camila-camila-0801-1.vhd'

@@ -193,7 +193,19 @@ class AzureManage:
             if blob.name == master_blob_name:
                 flag = False
         if flag:
-            self.blob_service.copy_blob(container_name, master_blob_name, self.master_image_path)
+            result = self.blob_service.copy_blob(container_name, master_blob_name, self.master_image_path)
+            try:
+                result = self.blob_service.get_blob_properties(container_name, master_blob_name)
+                while result['x-ms-copy-status'] == 'pending':
+                    time.sleep(1)
+                    result = self.blob_service.get_blob_properties(container_name, master_blob_name)
+                    tem, total = result['x-ms-copy-progress'].split('/')
+                    print("Copy progress: " + str(float(tem) * 100.0 / float(total)) + "%")
+            except:
+                print("Copy aborted!")
+                result = self.blob_service.get_blob_properties(container_name, master_blob_name)
+                self.blob_service.abort_copy_blob(container_name, master_blob_name, result['x-ms-copy-id'])
+                self.blob_service.delete_blob(container_name, master_blob_name)
         else:
             print("Master Image already exists. Skip the copy.")
 
@@ -203,6 +215,19 @@ class AzureManage:
                 flag = False
         if flag:
             self.blob_service.copy_blob(container_name, slave_blob_name, self.slave_image_path)
+            
+            try:
+                result = self.blob_service.get_blob_properties(container_name, slave_blob_name)
+                while result['x-ms-copy-status'] == 'pending':
+                    time.sleep(10)
+                    result = self.blob_service.get_blob_properties(container_name, slave_blob_name)
+                    tem, total = result['x-ms-copy-progress'].split('/')
+                    print("Copy progress: " + str(float(tem) * 100.0 / float(total)) + "%")
+            except:
+                print("Copy aborted!")
+                result = self.blob_service.get_blob_properties(container_name, slave_blob_name)
+                self.blob_service.abort_copy_blob(container_name, slave_blob_name, result['x-ms-copy-id'])
+                self.blob_service.delete_blob(container_name, slave_blob_name)
         else:
             print("Slave Image already exists. Skip the copy.")
 

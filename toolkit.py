@@ -91,7 +91,7 @@ class AzureManage:
         self.location = 'China East'
         self.master_image_path = 'https://portalvhdsm3378rflqk1z8.blob.core.chinacloudapi.cn/vhds/final.vhd'
         self.slave_image_path = 'https://portalvhds7wfwtym5v2wpk.blob.core.chinacloudapi.cn/vhds/slave-image.vhd'
-        self.disk_path = 'https://portalvhdsm3378rflqk1z8.blob.core.chinacloudapi.cn/vhds/Data.vhd'
+        self.disk_path = 'https://moocbackup.blob.core.chinacloudapi.cn/vhds/BackUp.vhd'
         #self.image_path = 'https://portalvhds7wfwtym5v2wpk.blob.core.chinacloudapi.cn/vhds/mooc-test-linx2-20140708-208615-os-2014-07-08.vhd'
         #self.disk_path = 'https://portalvhds7wfwtym5v2wpk.blob.core.chinacloudapi.cn/vhds/used-for-test-used-for-test-0723-1.vhd'
         #self.disk_path = 'https://portalvhdsttq9f0f7ly3t.blob.core.chinacloudapi.cn/vhds/camila-camila-0801-1.vhd'
@@ -189,6 +189,7 @@ class AzureManage:
         slave_blob_name = 'slave-image.vhd'
         container_name = 'vhds'
         flag = True
+        print "Copy Master Iamges"
         for blob in self.blob_service.list_blobs(container_name):
             if blob.name == master_blob_name:
                 flag = False
@@ -209,6 +210,7 @@ class AzureManage:
         else:
             print("Master Image already exists. Skip the copy.")
 
+        print "Copy Slave Image"
         flag = True
         for blob in self.blob_service.list_blobs(container_name):
             if blob.name == slave_blob_name:
@@ -257,6 +259,19 @@ class AzureManage:
             self.blob_service.abort_copy_blob(container_name, blob_name, result['x-ms-copy-id'])
             self.blob_service.delete_blob(container_name, blob_name)
         print("Copy finished!")
+
+    def nonblocking_copy_disk(self):
+        blob_name = 'data_disk.vhd'
+        container_name = 'vhds'
+        flag = True
+        for blob in self.blob_service.list_blobs(container_name):
+            if blob.name == blob_name:
+                flag = False
+        if flag:
+            blob_name = blob_name
+            self.blob_service.copy_blob(container_name, blob_name, self.disk_path)
+        else:
+            print("Disk already exists. Skip the copy.")
 
     def register_image(self):
         master_name = 'myVM-master'
@@ -315,7 +330,7 @@ class AzureManage:
         # Endpoint (port) configuration example, since documentation on this is lacking:
         endpoint_config = ConfigurationSet()
         endpoint_config.configuration_set_type = 'NetworkConfiguration'
-        endpoint1 = ConfigurationSetInputEndpoint(name='SSH', protocol='tcp', port='22', local_port= '22', load_balanced_endpoint_set_name=None, enable_direct_server_return=False)
+        endpoint1 = ConfigurationSetInputEndpoint(name='SSH', protocol='tcp', port='1001', local_port= '22', load_balanced_endpoint_set_name=None, enable_direct_server_return=False)
         endpoint2 = ConfigurationSetInputEndpoint(name='Port1', protocol='tcp', port='50030', local_port= '50030', load_balanced_endpoint_set_name=None, enable_direct_server_return=False)
         endpoint3 = ConfigurationSetInputEndpoint(name='Port2', protocol='tcp', port='50070', local_port= '50070', load_balanced_endpoint_set_name=None, enable_direct_server_return=False)
 
@@ -353,6 +368,8 @@ class AzureManage:
             image_name = master_image_name
             
         for i in range(2, 9):
+            endpoint = ConfigurationSetInputEndpoint(name='SSH', protocol='tcp', port=str(1000 + i), local_port= '22', load_balanced_endpoint_set_name=None, enable_direct_server_return=False)
+            #endpoint_config.input_endpoints.input_endpoints.append(endpoint)
             self.config['vm_name_' + str(i)] = name_i = name + str(i)
             ip = endpoint_config.static_vip.split('.')
             ip[-1] = str(i)
@@ -371,6 +388,7 @@ class AzureManage:
                 role_size='Medium'
             )
             self._wait_operand(result, "VM#{} Creation".format(i))
+            #endpoint_config.input_endpoints.input_endpoints.pop()
             #pdb.set_trace()
 
         self._dump_config()
@@ -430,18 +448,28 @@ class AzureManage:
         self._dump_config()
 
     def delete_os_images(self):
-        result = self.sms.delete_os_image('myVM-master', True)
+        result = self.sms.delete_os_image('myVM-master', False)
         self._wait_operand(result, 'OS image deletion')
-        result = self.sms.delete_os_image('myVM-slave', True)
+        result = self.sms.delete_os_image('myVM-slave', False)
         self._wait_operand(result, 'OS image deletion')
 
 
     def delete_disks(self):
         for disk in self.sms.list_disks():
             if disk.os == u'Linux':
+                while self.sms.get_disk(disk.name).attached_to:
+                    print "Waiting..."
+                    time.sleep(1)
                 print("Delete data disk " + disk.name)
                 result = self.sms.delete_disk(disk.name, True)
                 #self._wait_operand(result, disk.name + 'Deletion')
+            if disk.name == u'data_disk':
+                while self.sms.get_disk(disk.name).attached_to:
+                    print "Waiting..."
+                    time.sleep(1)
+                print("Delete data disk " + disk.name)
+                self.sms.delete_disk(disk.name, False)
+
 
     def delete_storage_account(self):
         self.sms.delete_storage_account(self.config['storage_name'])
@@ -450,6 +478,20 @@ class AzureManage:
 
     def delete_cloud_service(self):
         self.sms.delete_hosted_service(self.config['serv_name'])
+
+    def shutdown_roles(self):
+        roles = []
+        for i in range(1, 9):
+            roles.append(self.config['dep_name'] + str(i))
+
+        self.sms.shutdown_roles(self.serv_name, self.config['dep_name'], roles)
+
+    def start_roles(self):
+        roles = []
+        for i in range(1, 9):
+            roles.append(self.config['dep_name'] + str(i))
+
+        self.sms.start_roles(self.serv_name, self.config['dep_name'], roles)
 
     def _wait_operand(self, result, pro_name):
         status = 'Unknown'

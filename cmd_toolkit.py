@@ -20,6 +20,6 @@ class CMD:
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh.connect(hostname = self.host, port = 1001, username = self.account, password = self.password)
-        ssh.exec_commant('sudo mkdir /mnt/data')
+        ssh.exec_command('sudo mkdir /mnt/data')
         ssh.exec_command('sudo mount /dev/sdc1 /mnt/data')
         ssh.close()
